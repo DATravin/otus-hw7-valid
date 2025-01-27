@@ -72,13 +72,13 @@ def datamart(date_list,row,agg_cust,agg_term,list_for_fillna,sample_val):
     return df
 
 
-# # Функция для создания нового эксперимента или поднятия существующего
-# def get_experiment_id(model_name):
-#     experiment = mlflow.get_experiment_by_name(model_name)
-#     if experiment:
-#         return experiment.experiment_id
-#     else:
-#         return mlflow.create_experiment(model_name)
+# Функция для создания нового эксперимента или поднятия существующего
+def get_experiment_id(model_name):
+    experiment = mlflow.get_experiment_by_name(model_name)
+    if experiment:
+        return experiment.experiment_id
+    else:
+        return mlflow.create_experiment(model_name)
 
 
 # Функция для регистрации новой модели в mlflow в stage="Staging"
