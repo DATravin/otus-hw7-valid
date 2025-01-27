@@ -308,7 +308,7 @@ def main():
 
 #         model_info = mlflow.spark.log_model(spark_model=pipeline_model, artifact_path="model")
 
-        mlflow.spark.log_model(spark_model=model_best, model_name)
+        mlflow.spark.log_model(model_best,model_name)
 
 #         mlflow.catboost.log_model(model_2, model_name)
         transit_model(model_name, run_id)
