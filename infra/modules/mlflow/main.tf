@@ -77,7 +77,7 @@ resource "yandex_compute_instance" "vm" {
   provisioner "remote-exec" {
     inline = [
       "chmod +x /home/${var.instance_user}/setup.sh",
-      "sudo /home/${var.instance_user}/setup.sh"
+      # "sudo /home/${var.instance_user}/setup.sh"
     ]
   }
 
