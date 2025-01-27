@@ -20,6 +20,7 @@ from hyperopt import fmin, tpe, hp, STATUS_OK, Trials, SparkTrials, Trials
 import mlflow
 from mlflow.tracking import MlflowClient
 import pandas as pd
+#import numpy as np
 
 numericColumnsFinal =['term_amount_min',
          'term_amount_50perc',
@@ -288,8 +289,11 @@ def main():
         trials=trials
     )
 
-    model_best = trials.results[np.argmin([r['loss'] for r in trials.results])]['model']
-    best_result = trials.results[np.argmin([r['loss'] for r in trials.results])]['loss']
+    # model_best = trials.results[np.argmin([r['loss'] for r in trials.results])]['model']
+    # best_result = trials.results[np.argmin([r['loss'] for r in trials.results])]['loss']
+
+    model_best = trials.results[0]['model']
+    best_result = trials.results[0]['loss']
 
     model_name = 'classification'
 
@@ -301,21 +305,21 @@ def main():
 
         mlflow.log_params(best)
         mlflow.log_metric('auc', -best_result)
-        
+
 #         model_info = mlflow.spark.log_model(spark_model=pipeline_model, artifact_path="model")
 
         mlflow.spark.log_model(spark_model=model_best, model_name)
 
 #         mlflow.catboost.log_model(model_2, model_name)
         transit_model(model_name, run_id)
-    
+
     client = MlflowClient()
     model_versions = client.search_model_versions(filter_string=f"name = '{model_name}'")
-    
+
     if len(model_versions)==1:
         mlflow_change_stage(model_name, 1, 'Production')
-    
-    
+
+
 
 
 if __name__ == "__main__":
