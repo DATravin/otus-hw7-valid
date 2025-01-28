@@ -11,6 +11,7 @@ from pyspark.sql.types import IntegerType,LongType,DoubleType,StringType
 from pyspark.ml.feature import VectorAssembler
 from pyspark.ml.feature import MinMaxScaler
 from pyspark.ml.classification import RandomForestClassifier
+from pyspark.ml.classification import LogisticRegression
 from pyspark.ml import Pipeline
 from pyspark.ml.functions import vector_to_array
 from pyspark.ml.evaluation import BinaryClassificationEvaluator
@@ -289,6 +290,31 @@ def main():
         trials=trials
     )
 
+    ##### ТЕСТ
+
+    data = spark.createDataFrame([
+        (0.0, 1.0, 0.0),
+        (1.0, 0.0, 1.0),
+        (2.0, 1.0, 0.0),
+        (3.0, 1.0, 1.0)
+    ], ["label", "feature1", "feature2"])
+
+    assembler = VectorAssembler(inputCols=["feature1", "feature2"], outputCol="features")
+    training_data = assembler.transform(data)
+    lr = LogisticRegression(maxIter=10)
+    model = lr.fit(training_data)
+
+    with mlflow.start_run(experiment_id=experiment_id):
+        # Логируем модель
+        mlflow.spark.log_model(model, "model")
+
+        # Можно также логировать параметры и метрики
+        mlflow.log_param("maxIter", lr.getMaxIter())
+        mlflow.log_metric("training_accuracy", model.summary.accuracy)
+
+
+    ### ТЕСТ
+
     # model_best = trials.results[np.argmin([r['loss'] for r in trials.results])]['model']
     # best_result = trials.results[np.argmin([r['loss'] for r in trials.results])]['loss']
 
@@ -339,7 +365,7 @@ def main():
         mlflow.log_metric('cnt_test', X_test.count())
 
 # #         model_info = mlflow.spark.log_model(spark_model=pipeline_model, artifact_path="model")
-
+        # тут все заебись
         mlflow.spark.log_model(model_rf,model_name)
 
 # #         mlflow.catboost.log_model(model_2, model_name)
