@@ -136,7 +136,7 @@ with DAG(
         task_id="dp-cluster-pyspark-task",
         main_python_file_uri=f"s3a://{S3_SOURCE_BUCKET}/src/model_fit_2.py",
         connection_id=YC_SA_CONNECTION.conn_id,
-        args=["--bucket", S3_BUCKET_NAME_COLD, "--mlflow",MLFLOW_HOST],
+        args=["--bucket", S3_BUCKET_NAME_COLD, "--mlflow",MLFLOW_HOST,"--aws_acc",S3_ACCESS_KEY,"--aws_sec",S3_SECRET_KEY],
         dag=ingest_dag,
         properties = {'spark.submit.deployMode': 'cluster',
                     'spark.yarn.dist.archives': f's3a://{S3_BUCKET_NAME_COLD}/venvs/hyp_mlf_pd_log_arg.tar.gz#venv1',

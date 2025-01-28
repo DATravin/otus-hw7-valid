@@ -387,11 +387,17 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--bucket", required=True, help="S3 bucket name")
     parser.add_argument("--mlflow", required=True, help="Mlflow uri")
+    parser.add_argument("--aws_acc", required=True, help="AWS accses key")
+    parser.add_argument("--aws_sec", required=True, help="AWS secret key")
     args = parser.parse_args()
     bucket_name = args.bucket
     mlflow_ip = args.mlflow
+    aws_acc = args.aws_acc
+    aws_sec = args.aws_sec
 
     os.environ['MLFLOW_S3_ENDPOINT_URL'] = 'https://storage.yandexcloud.net'
     os.environ['MLFLOW_TRACKING_URI'] = f'http://{mlflow_ip}:8000'
+    os.environ["AWS_ACCESS_KEY_ID"] = f'{aws_acc}'
+    os.environ["AWS_SECRET_ACCESS_KEY"] = f'{aws_sec}'
 
     main()
