@@ -314,6 +314,7 @@ def main():
         .setMaxDepth(best_params['maxDepth'])\
         .setNumTrees(best_params['numTrees'])\
 
+    # тут все заебись
     model_rf = rf.fit(X_train)
 
     X_test = pipeline_preprocess.fit(test_sdf).transform(test_sdf)
@@ -327,14 +328,15 @@ def main():
 
     experiment_id = get_experiment_id(model_name)
 
-#     with mlflow.start_run(experiment_id=experiment_id) as run:
+    with mlflow.start_run(experiment_id=experiment_id) as run:
 
 #         # run_id = run.info.run_id
 
-#         mlflow.log_params(best_params)
-#         mlflow.log_metric('auc', -best_result)
-#         mlflow.log_metric('ex_id', experiment_id)
-#         mlflow.log_metric('auc_final', auc_final)
+        mlflow.log_params(best_params)
+        mlflow.log_metric('auc', -best_result)
+        mlflow.log_metric('ex_id', experiment_id)
+        mlflow.log_metric('auc_final', auc_final)
+        mlflow.log_metric('cnt_test', X_test.count())
 
 # #         model_info = mlflow.spark.log_model(spark_model=pipeline_model, artifact_path="model")
 
