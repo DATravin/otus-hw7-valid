@@ -305,19 +305,20 @@ def main():
 
         mlflow.log_params(best)
         mlflow.log_metric('auc', -best_result)
+        mlflow.log_metric('ex_id', experiment_id)
 
 #         model_info = mlflow.spark.log_model(spark_model=pipeline_model, artifact_path="model")
 
         mlflow.spark.log_model(model_best,model_name)
 
-#         mlflow.catboost.log_model(model_2, model_name)
-        transit_model(model_name, run_id)
+# #         mlflow.catboost.log_model(model_2, model_name)
+#         transit_model(model_name, run_id)
 
-    client = MlflowClient()
-    model_versions = client.search_model_versions(filter_string=f"name = '{model_name}'")
+#     client = MlflowClient()
+#     model_versions = client.search_model_versions(filter_string=f"name = '{model_name}'")
 
-    if len(model_versions)==1:
-        mlflow_change_stage(model_name, 1, 'Production')
+#     if len(model_versions)==1:
+#         mlflow_change_stage(model_name, 1, 'Production')
 
 
 
