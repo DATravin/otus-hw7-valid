@@ -292,53 +292,53 @@ def main():
     # model_best = trials.results[np.argmin([r['loss'] for r in trials.results])]['model']
     # best_result = trials.results[np.argmin([r['loss'] for r in trials.results])]['loss']
 
-    model_best = trials.results[0]['model']
-    best_result = trials.results[0]['loss']
-    best_params = trials.results[0]['params']
+#     model_best = trials.results[0]['model']
+#     best_result = trials.results[0]['loss']
+#     best_params = trials.results[0]['params']
 
-    assembler = VectorAssembler()\
-    .setInputCols(featureColumns)\
-    .setOutputCol("features")
+#     assembler = VectorAssembler()\
+#     .setInputCols(featureColumns)\
+#     .setOutputCol("features")
 
-    scaler = MinMaxScaler()\
-        .setInputCol("features")\
-        .setOutputCol("scaledFeatures")
+#     scaler = MinMaxScaler()\
+#         .setInputCol("features")\
+#         .setOutputCol("scaledFeatures")
 
-    pipeline_preprocess = Pipeline(stages = [assembler,scaler])
+#     pipeline_preprocess = Pipeline(stages = [assembler,scaler])
 
-    X_train = pipeline_preprocess.fit(train_sdf).transform(train_sdf)
+#     X_train = pipeline_preprocess.fit(train_sdf).transform(train_sdf)
 
-    rf = RandomForestClassifier()\
-        .setFeaturesCol('scaledFeatures')\
-        .setLabelCol('target')\
-        .setMaxDepth(best_params['maxDepth'])\
-        .setNumTrees(best_params['numTrees'])\
+#     rf = RandomForestClassifier()\
+#         .setFeaturesCol('scaledFeatures')\
+#         .setLabelCol('target')\
+#         .setMaxDepth(best_params['maxDepth'])\
+#         .setNumTrees(best_params['numTrees'])\
 
-    rf.fit(X_train)
+#     rf.fit(X_train)
 
-    X_test = pipeline_preprocess.transform(test_sdf)
+#     X_test = pipeline_preprocess.transform(test_sdf)
 
-    evaluator = BinaryClassificationEvaluator()\
-            .setLabelCol('target')
+#     evaluator = BinaryClassificationEvaluator()\
+#             .setLabelCol('target')
 
-    auc_final = evaluator.evaluate(rf.transform(X_test))
+#     auc_final = evaluator.evaluate(rf.transform(X_test))
 
-    model_name = 'classification'
+#     model_name = 'classification'
 
-    experiment_id = get_experiment_id(model_name)
+#     experiment_id = get_experiment_id(model_name)
 
-    with mlflow.start_run(experiment_id=experiment_id) as run:
+#     with mlflow.start_run(experiment_id=experiment_id) as run:
 
-        # run_id = run.info.run_id
+#         # run_id = run.info.run_id
 
-        mlflow.log_params(best_params)
-        mlflow.log_metric('auc', -best_result)
-        mlflow.log_metric('ex_id', experiment_id)
-        mlflow.log_metric('auc_final', auc_final)
+#         mlflow.log_params(best_params)
+#         mlflow.log_metric('auc', -best_result)
+#         mlflow.log_metric('ex_id', experiment_id)
+#         mlflow.log_metric('auc_final', auc_final)
 
-#         model_info = mlflow.spark.log_model(spark_model=pipeline_model, artifact_path="model")
+# #         model_info = mlflow.spark.log_model(spark_model=pipeline_model, artifact_path="model")
 
-        mlflow.spark.log_model(rf,model_name)
+#         mlflow.spark.log_model(rf,model_name)
 
 # #         mlflow.catboost.log_model(model_2, model_name)
 #         transit_model(model_name, run_id)
