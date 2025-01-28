@@ -308,20 +308,20 @@ def main():
 
     X_train = pipeline_preprocess.fit(train_sdf).transform(train_sdf)
 
-#     rf = RandomForestClassifier()\
-#         .setFeaturesCol('scaledFeatures')\
-#         .setLabelCol('target')\
-#         .setMaxDepth(best_params['maxDepth'])\
-#         .setNumTrees(best_params['numTrees'])\
+    rf = RandomForestClassifier()\
+        .setFeaturesCol('scaledFeatures')\
+        .setLabelCol('target')\
+        .setMaxDepth(best_params['maxDepth'])\
+        .setNumTrees(best_params['numTrees'])\
 
-#     rf.fit(X_train)
+    rf.fit(X_train)
 
-#     X_test = pipeline_preprocess.transform(test_sdf)
+    X_test = pipeline_preprocess.transform(test_sdf)
 
-#     evaluator = BinaryClassificationEvaluator()\
-#             .setLabelCol('target')
+    evaluator = BinaryClassificationEvaluator()\
+            .setLabelCol('target')
 
-#     auc_final = evaluator.evaluate(rf.transform(X_test))
+    auc_final = evaluator.evaluate(rf.transform(X_test))
 
 #     model_name = 'classification'
 
