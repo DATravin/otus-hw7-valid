@@ -316,16 +316,16 @@ def main():
 
     model_rf = rf.fit(X_train)
 
-    # X_test = pipeline_preprocess.transform(test_sdf)
+    X_test = pipeline_preprocess.fit(test_sdf).transform(test_sdf)
 
-    # evaluator = BinaryClassificationEvaluator()\
-    #         .setLabelCol('target')
+    evaluator = BinaryClassificationEvaluator()\
+            .setLabelCol('target')
 
-    # auc_final = evaluator.evaluate(rf.transform(X_test))
+    auc_final = evaluator.evaluate(model_rf.transform(X_test))
 
-#     model_name = 'classification'
+    model_name = 'classification'
 
-#     experiment_id = get_experiment_id(model_name)
+    experiment_id = get_experiment_id(model_name)
 
 #     with mlflow.start_run(experiment_id=experiment_id) as run:
 
