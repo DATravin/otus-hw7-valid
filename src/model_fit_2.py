@@ -292,21 +292,21 @@ def main():
     # model_best = trials.results[np.argmin([r['loss'] for r in trials.results])]['model']
     # best_result = trials.results[np.argmin([r['loss'] for r in trials.results])]['loss']
 
-#     model_best = trials.results[0]['model']
-#     best_result = trials.results[0]['loss']
-#     best_params = trials.results[0]['params']
+    model_best = trials.results[0]['model']
+    best_result = trials.results[0]['loss']
+    best_params = trials.results[0]['params']
 
-#     assembler = VectorAssembler()\
-#     .setInputCols(featureColumns)\
-#     .setOutputCol("features")
+    assembler = VectorAssembler()\
+    .setInputCols(featureColumns)\
+    .setOutputCol("features")
 
-#     scaler = MinMaxScaler()\
-#         .setInputCol("features")\
-#         .setOutputCol("scaledFeatures")
+    scaler = MinMaxScaler()\
+        .setInputCol("features")\
+        .setOutputCol("scaledFeatures")
 
-#     pipeline_preprocess = Pipeline(stages = [assembler,scaler])
+    pipeline_preprocess = Pipeline(stages = [assembler,scaler])
 
-#     X_train = pipeline_preprocess.fit(train_sdf).transform(train_sdf)
+    X_train = pipeline_preprocess.fit(train_sdf).transform(train_sdf)
 
 #     rf = RandomForestClassifier()\
 #         .setFeaturesCol('scaledFeatures')\
