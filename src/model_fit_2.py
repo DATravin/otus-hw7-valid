@@ -21,6 +21,8 @@ from hyperopt import fmin, tpe, hp, STATUS_OK, Trials, SparkTrials, Trials
 import mlflow
 from mlflow.tracking import MlflowClient
 import pandas as pd
+import mlflow.spark
+from mlflow.store.artifact.runs_artifact_repo import RunsArtifactRepository
 #import numpy as np
 
 numericColumnsFinal =['term_amount_min',
