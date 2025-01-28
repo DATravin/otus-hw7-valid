@@ -173,6 +173,8 @@ def objective(params, train_data, test_data):
         # mlflow.log_metric('f1', f1)
         # mlflow.log_metric('f_bet', f_bet)
 
+        mlflow.spark.log_model(rf_model,'classification')
+
     return {'loss': -auc, 'status': STATUS_OK, 'model': rf_model}
 
 
