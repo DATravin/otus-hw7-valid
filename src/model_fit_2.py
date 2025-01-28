@@ -173,9 +173,9 @@ def objective(params, train_data, test_data):
         # mlflow.log_metric('f1', f1)
         # mlflow.log_metric('f_bet', f_bet)
 
-        mlflow.spark.log_model(rf_model,'classification')
+        #mlflow.spark.log_model(rf_model,'classification')
 
-    return {'loss': -auc, 'status': STATUS_OK, 'model': rf_model}
+    return {'loss': -auc, 'status': STATUS_OK, 'model': rf_model, 'params': params}
 
 
 def main():
@@ -271,8 +271,6 @@ def main():
 
     featureColumns = numericColumnsFinal
 
-
-
     mlflow.set_experiment('classification')
 
     trials = Trials()
@@ -296,6 +294,28 @@ def main():
 
     model_best = trials.results[0]['model']
     best_result = trials.results[0]['loss']
+    best_params = trials.results[0]['params']
+
+    assembler = VectorAssembler()\
+    .setInputCols(featureColumns)\
+    .setOutputCol("features")
+
+    scaler = MinMaxScaler()\
+        .setInputCol("features")\
+        .setOutputCol("scaledFeatures")
+
+    pipeline_preprocess = Pipeline(stages = [assembler,scaler])
+
+    X_train = pipeline_preprocess.fit(train_sdf).transform(train_sdf)
+
+    rf = RandomForestClassifier()\
+        .setFeaturesCol('scaledFeatures')\
+        .setLabelCol('target')\
+        .setMaxDepth(best_params['maxDepth'])\
+        .setNumTrees(best_params['numTrees'])\
+
+    rf_model_final = rf.fit(X_train)
+
 
     model_name = 'classification'
 
@@ -303,7 +323,7 @@ def main():
 
     with mlflow.start_run(experiment_id=experiment_id) as run:
 
-        run_id = run.info.run_id
+        # run_id = run.info.run_id
 
         mlflow.log_params(best)
         mlflow.log_metric('auc', -best_result)
@@ -311,7 +331,7 @@ def main():
 
 #         model_info = mlflow.spark.log_model(spark_model=pipeline_model, artifact_path="model")
 
-        mlflow.spark.log_model(model_best,model_name)
+        mlflow.spark.log_model(rf_model_final,model_name)
 
 # #         mlflow.catboost.log_model(model_2, model_name)
 #         transit_model(model_name, run_id)
