@@ -275,6 +275,7 @@ def main():
     featureColumns = numericColumnsFinal
 
     mlflow.set_experiment('classification')
+    # mlflow.spark.autolog()
 
     trials = Trials()
 
@@ -294,25 +295,25 @@ def main():
 
     ##### ТЕСТ
 
-    data = spark.createDataFrame([
-        (0.0, 1.0, 0.0),
-        (1.0, 0.0, 1.0),
-        (2.0, 1.0, 0.0),
-        (3.0, 1.0, 1.0)
-    ], ["label", "feature1", "feature2"])
+    #data = spark.createDataFrame([
+    #    (0.0, 1.0, 0.0),
+    #    (1.0, 0.0, 1.0),
+    #    (2.0, 1.0, 0.0),
+    #    (3.0, 1.0, 1.0)
+    #], ["label", "feature1", "feature2"])
 
-    assembler = VectorAssembler(inputCols=["feature1", "feature2"], outputCol="features")
-    training_data = assembler.transform(data)
-    lr = LogisticRegression(maxIter=10)
-    model = lr.fit(training_data)
+    #assembler = VectorAssembler(inputCols=["feature1", "feature2"], outputCol="features")
+    #training_data = assembler.transform(data)
+    #lr = LogisticRegression(maxIter=10)
+    #model = lr.fit(training_data)
 
-    with mlflow.start_run(experiment_id=experiment_id):
-        # Логируем модель
-        mlflow.spark.log_model(model, "model")
-
-        # Можно также логировать параметры и метрики
-        mlflow.log_param("maxIter", lr.getMaxIter())
-        mlflow.log_metric("training_accuracy", model.summary.accuracy)
+    #with mlflow.start_run(experiment_id=experiment_id):
+    #    # Логируем модель
+    #    mlflow.spark.log_model(model, "model")
+    #
+    #    # Можно также логировать параметры и метрики
+    #    mlflow.log_param("maxIter", lr.getMaxIter())
+    #    mlflow.log_metric("training_accuracy", model.summary.accuracy)
 
 
     ### ТЕСТ
@@ -342,7 +343,7 @@ def main():
         .setMaxDepth(best_params['maxDepth'])\
         .setNumTrees(best_params['numTrees'])\
 
-    # тут все заебись
+    
     model_rf = rf.fit(X_train)
 
     X_test = pipeline_preprocess.fit(test_sdf).transform(test_sdf)
@@ -354,21 +355,28 @@ def main():
 
     model_name = 'classification'
 
-    experiment_id = get_experiment_id(model_name)
+    #experiment_id = get_experiment_id(model_name)
 
-    with mlflow.start_run(experiment_id=experiment_id) as run:
+    with mlflow.start_run() as run:
+        
+        mlflow.spark.log_model(model_rf, artifact_path="models", registered_model_name=model_name)
 
-#         # run_id = run.info.run_id
+        # run_id = run.info.run_id
 
         mlflow.log_params(best_params)
         mlflow.log_metric('auc', -best_result)
-        mlflow.log_metric('ex_id', experiment_id)
+        # mlflow.log_metric('ex_id', experiment_id)
         mlflow.log_metric('auc_final', auc_final)
+        #mlflow.log_metric('run_id',run_id)
         mlflow.log_metric('cnt_test', X_test.count())
+        
+        mlflow.end_run()
+
+        #result = mlflow.register_model(f"runs:/{run_id}/{model_name}", model_name)
 
 # #         model_info = mlflow.spark.log_model(spark_model=pipeline_model, artifact_path="model")
         # тут все заебись
-        mlflow.spark.log_model(model_rf,model_name)
+        #mlflow.spark.log_model(model_rf,model_name)
 
 # #         mlflow.catboost.log_model(model_2, model_name)
 #         transit_model(model_name, run_id)
