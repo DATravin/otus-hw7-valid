@@ -325,7 +325,7 @@ def main():
 
         # run_id = run.info.run_id
 
-        mlflow.log_params(best)
+        mlflow.log_params(best_params)
         mlflow.log_metric('auc', -best_result)
         mlflow.log_metric('ex_id', experiment_id)
 
