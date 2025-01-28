@@ -314,8 +314,14 @@ def main():
         .setMaxDepth(best_params['maxDepth'])\
         .setNumTrees(best_params['numTrees'])\
 
-    rf_model_final = rf.fit(X_train)
+    rf.fit(X_train)
 
+    X_test = pipeline_preprocess.transform(test_sdf)
+
+    evaluator = BinaryClassificationEvaluator()\
+            .setLabelCol('target')
+
+    auc_final = evaluator.evaluate(rf.transform(X_test))
 
     model_name = 'classification'
 
@@ -328,10 +334,11 @@ def main():
         mlflow.log_params(best_params)
         mlflow.log_metric('auc', -best_result)
         mlflow.log_metric('ex_id', experiment_id)
+        mlflow.log_metric('auc_final', auc_final)
 
 #         model_info = mlflow.spark.log_model(spark_model=pipeline_model, artifact_path="model")
 
-        mlflow.spark.log_model(rf_model_final,model_name)
+        mlflow.spark.log_model(rf,model_name)
 
 # #         mlflow.catboost.log_model(model_2, model_name)
 #         transit_model(model_name, run_id)
