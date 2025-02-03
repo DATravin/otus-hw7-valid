@@ -208,6 +208,7 @@ def main():
     fmt= "parquet"
 
     (test_sdf
+     .repartition(1)
      .write
      .format(fmt)
      .mode(mode)
