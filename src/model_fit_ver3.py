@@ -3,7 +3,6 @@
 # findspark.init()
 
 import os
-import sys
 from loguru import logger
 from functools import partial
 from argparse import ArgumentParser
@@ -12,6 +11,7 @@ from pyspark.sql.types import IntegerType,LongType,DoubleType,StringType
 from pyspark.ml.feature import VectorAssembler
 from pyspark.ml.feature import MinMaxScaler
 from pyspark.ml.classification import RandomForestClassifier
+from pyspark.ml.classification import LogisticRegression
 from pyspark.ml import Pipeline
 from pyspark.ml.functions import vector_to_array
 from pyspark.ml.evaluation import BinaryClassificationEvaluator
@@ -21,7 +21,8 @@ from hyperopt import fmin, tpe, hp, STATUS_OK, Trials, SparkTrials, Trials
 import mlflow
 from mlflow.tracking import MlflowClient
 import pandas as pd
-from scipy import stats
+import mlflow.spark
+from mlflow.store.artifact.runs_artifact_repo import RunsArtifactRepository
 import numpy as np
 
 numericColumnsFinal =['term_amount_min',
@@ -74,13 +75,13 @@ def datamart(date_list,row,agg_cust,agg_term,list_for_fillna,sample_val):
     return df
 
 
-# # Функция для создания нового эксперимента или поднятия существующего
-# def get_experiment_id(model_name):
-#     experiment = mlflow.get_experiment_by_name(model_name)
-#     if experiment:
-#         return experiment.experiment_id
-#     else:
-#         return mlflow.create_experiment(model_name)
+# Функция для создания нового эксперимента или поднятия существующего
+def get_experiment_id(model_name):
+    experiment = mlflow.get_experiment_by_name(model_name)
+    if experiment:
+        return experiment.experiment_id
+    else:
+        return mlflow.create_experiment(model_name)
 
 
 # Функция для регистрации новой модели в mlflow в stage="Staging"
@@ -91,17 +92,6 @@ def transit_model(model_name, run_id):
     # Если не нужно сразу переводить модель в Staging, то строку ниже закомментировать.
     # В этом случае новая модель или новая версия модели регистрируется в Stage=None
     client.transition_model_version_stage(name=model_name, version=mv.version, stage="Staging")
-
-
-def get_model(model_name: str, version: str):
-
-    # model_uri: str = f"models:/{model_name}/{model_stage}"
-    # model = mlflow.spark.load_model(model_uri)
-
-    model_uri=f'models:/{model_name}/{version}'
-    model = mlflow.spark.load_model(model_uri)
-
-    return model
 
 
 # Функция для смены STAGE по указанной версии модели
@@ -116,20 +106,90 @@ search_space = {
 }
 
 
+def objective(params, train_data, test_data):
+    logger.info(f"params {params}")
+
+
+    assembler = VectorAssembler()\
+    .setInputCols(featureColumns)\
+    .setOutputCol("features")
+
+    scaler = MinMaxScaler()\
+        .setInputCol("features")\
+        .setOutputCol("scaledFeatures")
+
+    rf = RandomForestClassifier()\
+        .setFeaturesCol('scaledFeatures')\
+        .setLabelCol('target')\
+        .setMaxDepth(params['maxDepth'])\
+        .setNumTrees(params['numTrees'])\
+
+    pipeline = Pipeline(stages = [assembler,scaler,rf])
+
+    rf_model = pipeline.fit(train_data)
+
+    evaluator = BinaryClassificationEvaluator()\
+            .setLabelCol('target')
+
+    auc = evaluator.evaluate(rf_model.transform(test_data))
+
+    th = 0.2
+    predictions = rf_model.transform(test_data)
+
+    predictions = (predictions
+              .withColumn('probability_arr', vector_to_array('probability'))
+              .withColumn('probability_one', F.col('probability_arr')[1])
+              .withColumn('pred_loc',
+                    F.when(F.col('probability_one') >= th, F.lit(1))
+                    .otherwise(F.lit(0)))
+              )
+
+    tp = predictions.filter((F.col("target") == 1) & (F.col("pred_loc") == 1)).count()
+    tn = predictions.filter((F.col("target") == 0) & (F.col("pred_loc") == 0)).count()
+    fp = predictions.filter((F.col("target") == 0) & (F.col("pred_loc") == 1)).count()
+    fn = predictions.filter((F.col("target") == 1) & (F.col("pred_loc") == 0)).count()
+
+    accuracy = (tp + tn) / (tp + tn + fp + fn)
+    precision = tp / (tp + fp)
+    recall = tp / (tp + fn)
+    f1 = 2*tp / (2*tp + fp +fn)
+    beta = 1.5
+    f_bet = (1+beta*beta)*tp / ((1+beta*beta)*tp+fp+beta*beta*fn)
+
+    dct_metrics = {
+        'auc': auc,
+        'trashhold': th,
+        'accuracy': accuracy,
+        'recall': recall,
+        'precision': precision,
+        'f1': f1,
+        'f_bet': f_bet
+        }
+
+    with mlflow.start_run():
+        mlflow.log_params(params)
+        mlflow.log_metrics(dct_metrics)
+        # mlflow.log_metric('auc', auc)
+        # mlflow.log_metric('accuracy', accuracy)
+        # mlflow.log_metric('recall', recall)
+        # mlflow.log_metric('precision', precision)
+        # mlflow.log_metric('f1', f1)
+        # mlflow.log_metric('f_bet', f_bet)
+
+        #mlflow.spark.log_model(rf_model,'classification')
+
+    return {'loss': -auc, 'status': STATUS_OK, 'model': rf_model, 'params': params}
+
+
 def main():
 
+    #logger.info("Creating Spark Session ...")
 
-    mlflow.set_experiment('classification')
-
-    model_name = 'classification'
-
-    client = MlflowClient()
-    model_versions = client.search_model_versions(filter_string=f"name = '{model_name}'")
-
-    if len(model_versions)==1:
-        logger.info("only one version of model. And module")
-        sys.exit()
-
+    # spark = SparkSession\
+    #     .builder\
+    #     .appName('Spark ML Research')\
+    #     .config('spark.sql.repl.eagerEval.enabled', True) \
+    #     .getOrCreate()
 
     spark = SparkSession\
         .builder\
@@ -192,108 +252,92 @@ def main():
 
 
 
-#     train_dates = time_keys[20:23]
-    verif_dates = time_keys[25]
+    train_dates = time_keys[20:23]
+    test_dates = time_keys[24]
 
-    logger.info(f"test period {verif_dates}")
+    logger.info(f"traind perion {train_dates} test period {test_dates}")
 
-#     train_sdf = datamart(train_dates,row_sdf,agg_cust_sdf,agg_term_sdf,list_for_fillna,sample_val = 0.5)
-    test_sdf = datamart(verif_dates,row_sdf,agg_cust_sdf,agg_term_sdf,list_for_fillna,sample_val = 0.1)
+    train_sdf = datamart(train_dates,row_sdf,agg_cust_sdf,agg_term_sdf,list_for_fillna,sample_val = 0.5)
+    test_sdf = datamart(test_dates,row_sdf,agg_cust_sdf,agg_term_sdf,list_for_fillna,sample_val = 1)
 
+    numericColumnsFinal =['term_amount_min',
+         'term_amount_50perc',
+         'term_amount_max',
+         'tx_amount',
+         'term_avg_amount_in_day_7d',
+         'sh_bad_trans_per_cust',
+         'cust_cnt_in_day_7d',
+        # 'tx_fraud',
+         'rel_cust_50perc',
+         'sh_bad_days_per_term',
+         'rel_cust_amount_to_max']
 
-    # bucket_name = 'cold-s3-bucket'
-    output_table_path = f"s3a://{temp_bucket_name}/temp_verif.parquet"
+    featureColumns = numericColumnsFinal
 
-    mode ="append"
-    fmt= "parquet"
+    mlflow.set_experiment('classification')
+    # mlflow.spark.autolog()
 
-    (test_sdf
-     .write
-     .format(fmt)
-     .mode(mode)
-     .save(output_table_path))
+    trials = Trials()
 
+    # #mlflow.set_experiment('classification')
 
-    logger.info(f"verif data has been prepared")
-
-
-    model_metadata = client.get_latest_versions(model_name, stages=["Staging"])
-    staging_ver = model_metadata[0].version
-
-    model_metadata = client.get_latest_versions(model_name, stages=["Production"])
-    production_ver = model_metadata[0].version
-
-
-    prod_model = get_model(model_name,production_ver)
-
-    stage_model = get_model(model_name,staging_ver)
-
-
-    # ver_acrh=0
-
-    # client = MlflowClient()
-    # model_versions = client.search_model_versions(filter_string=f"name = '{model_name}'")
-
-
-    # for ver in model_versions:
-    #     if ver.current_stage =='Production':
-    #         ver_prod = ver.version
-    #     elif ver.current_stage =='Staging':
-    #         ver_stage = ver.version
-    #     elif ver.current_stage =='Archived':
-    #         if int(ver.version)>int(ver_acrh):
-    #             ver_acrh = int(ver.version)
+    best = fmin(
+        fn=partial(
+            objective,
+            train_data=train_sdf,
+            test_data=test_sdf
+        ),
+        space=search_space,
+        algo=tpe.suggest,
+        max_evals=2,
+        trials=trials
+    )
 
 
-#     client = MlflowClient()
-#     model_versions = client.search_model_versions(filter_string=f"name = '{model_name}'")
-#     model_versions
+    model_best = trials.results[np.argmin([r['loss'] for r in trials.results])]['model']
+    best_result = trials.results[np.argmin([r['loss'] for r in trials.results])]['loss']
+    best_params = trials.results[np.argmin([r['loss'] for r in trials.results])]['params']
 
-    evaluator = BinaryClassificationEvaluator()\
-            .setLabelCol('target')
+    # model_best = trials.results[0]['model']
+    # best_result = trials.results[0]['loss']
+    # best_params = trials.results[0]['params']
 
-    verif_sdf = spark.read.parquet(output_table_path)
+    model_name = 'classification'
 
-    vec1=[]
-    vec2=[]
+    #experiment_id = get_experiment_id(model_name)
 
-    for i in range(0,100):
+    best_params['MLFLOW_S3_ENDPOINT_URL'] = os.environ['MLFLOW_S3_ENDPOINT_URL']
+    best_params['MLFLOW_TRACKING_URI'] = os.environ['MLFLOW_TRACKING_URI']
+    best_params['AWS_ACCESS_KEY_ID'] = os.environ["AWS_ACCESS_KEY_ID"]
+    best_params['AWS_SECRET_ACCESS_KEY'] = os.environ["AWS_SECRET_ACCESS_KEY"]
+    best_params['S3_ENDPOINT_URL'] = os.environ["S3_ENDPOINT_URL"]
+    best_params['S3_BUCKET_NAME'] = os.environ["S3_BUCKET_NAME"]
 
+    with mlflow.start_run() as run:
 
-        test_date_new = verif_sdf.sample(0.33)
+        mlflow.log_params(best_params)
+        mlflow.log_metric('auc', -best_result)
 
+        mlflow.spark.log_model(model_best, artifact_path="models", registered_model_name=model_name)
 
-        auc1 = evaluator.evaluate(prod_model.transform(test_date_new))
-        auc2 = evaluator.evaluate(stage_model.transform(test_date_new))
-
-        vec1.append(auc1)
-        vec2.append(auc2)
-
-
-    logger.info(f"experement has been done")
-
-    t, p_value  = stats.ttest_ind(vec1, vec2)
-
-    alpha = 0.05
+        # run_id = run.info.run_id
 
 
-    if p_value < alpha:
-
-        if np.mean(vec2)>np.mean(vec1):
-            logger.info(f"new model is better")
-
-            client.transition_model_version_stage(name=model_name, version=staging_ver, stage="Production")
-            client.transition_model_version_stage(name=model_name, version=production_ver, stage="None")
 
 
-        elif np.mean(vec2)<np.mean(vec1):
-            logger.info(f"old model is better")
-            client.transition_model_version_stage(name=model_name, version=staging_ver, stage="None")
+        client = MlflowClient()
+        model_versions = client.search_model_versions(filter_string=f"name = '{model_name}'")
 
-    else:
-        logger.info(f"there is no difference between models")
-        client.transition_model_version_stage(name=model_name, version=staging_ver, stage="None")
 
+        if len(model_versions)==1:
+            cur_version = model_versions[0].version
+            client.transition_model_version_stage(name=model_name, version=cur_version, stage="Production")
+        else:
+            cur_version = client.get_latest_versions(model_name, stages=["None"])[0].version
+            client.transition_model_version_stage(name=model_name, version=cur_version, stage="Staging")
+
+
+        mlflow.end_run()
 
 
 
@@ -310,13 +354,12 @@ if __name__ == "__main__":
     mlflow_ip = args.mlflow
     aws_acc = args.aws_acc
     aws_sec = args.aws_sec
-    temp_bucket_name = args.bucket_art
 
     os.environ['MLFLOW_S3_ENDPOINT_URL'] = 'https://storage.yandexcloud.net'
     os.environ['MLFLOW_TRACKING_URI'] = f'http://{mlflow_ip}:8000'
     os.environ["AWS_ACCESS_KEY_ID"] = f'{aws_acc}'
     os.environ["AWS_SECRET_ACCESS_KEY"] = f'{aws_sec}'
     os.environ["S3_ENDPOINT_URL"] = 'https://storage.yandexcloud.net'
-    os.environ["S3_BUCKET_NAME"] = temp_bucket_name
+    os.environ["S3_BUCKET_NAME"] = args.bucket_art
 
     main()

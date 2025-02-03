@@ -99,7 +99,7 @@ setup_airflow_connections(YC_S3_CONNECTION, YC_SA_CONNECTION)
 
 # Настройки DAG
 with DAG(
-    dag_id="model_pipeline",
+    dag_id="model_fitting_verif",
     start_date=datetime(year=2024, month=1, day=20),
     schedule_interval=timedelta(minutes=60*24),
     catchup=False,
@@ -134,16 +134,38 @@ with DAG(
     # 2 этап: запуск задания PySpark
     poke_spark_processing = DataprocCreatePysparkJobOperator(
         task_id="dp-cluster-pyspark-task",
-        main_python_file_uri=f"s3a://{S3_SOURCE_BUCKET}/src/model_fit_2.py",
+        main_python_file_uri=f"s3a://{S3_SOURCE_BUCKET}/src/model_fit_ver3.py",
         connection_id=YC_SA_CONNECTION.conn_id,
-        args=["--bucket", S3_BUCKET_NAME_COLD, "--mlflow",MLFLOW_HOST,"--aws_acc",S3_ACCESS_KEY,"--aws_sec",S3_SECRET_KEY],
+        args=["--bucket", S3_BUCKET_NAME_COLD,\
+              "--mlflow",MLFLOW_HOST,\
+              "--aws_acc",S3_ACCESS_KEY,\
+              "--aws_sec",S3_SECRET_KEY, \
+              "--bucket_art",S3_BUCKET_NAME
+              ],
         dag=ingest_dag,
         properties = {'spark.submit.deployMode': 'cluster',
-                    'spark.yarn.dist.archives': f's3a://{S3_BUCKET_NAME_COLD}/venvs/hyp_mlf_pd_log_arg.tar.gz#venv1',
+                    'spark.yarn.dist.archives': f's3a://{S3_BUCKET_NAME_COLD}/venvs/venv_20250203_hw7_ver3.tar.gz#venv1',
                     'spark.yarn.appMasterEnv.PYSPARK_PYTHON': './venv1/bin/python',
                     'spark.yarn.appMasterEnv.PYSPARK_DRIVER_PYTHON': './venv1/bin/python'}
     )
-    # 3 этап: удаление Dataproc кластера
+    # 3 этап: запуск задания PySpark a-бтест
+    poke_spark_processing2 = DataprocCreatePysparkJobOperator(
+        task_id="dp-cluster-pyspark-task2",
+        main_python_file_uri=f"s3a://{S3_SOURCE_BUCKET}/src/model_verif.py",
+        connection_id=YC_SA_CONNECTION.conn_id,
+        args=["--bucket", S3_BUCKET_NAME_COLD,\
+              "--mlflow",MLFLOW_HOST,\
+              "--aws_acc",S3_ACCESS_KEY,\
+              "--aws_sec",S3_SECRET_KEY, \
+              "--bucket_art",S3_BUCKET_NAME,
+              ],
+        dag=ingest_dag,
+        properties = {'spark.submit.deployMode': 'cluster',
+                    'spark.yarn.dist.archives': f's3a://{S3_BUCKET_NAME_COLD}/venvs/venv_20250203_hw7_ver3.tar.gz#venv1',
+                    'spark.yarn.appMasterEnv.PYSPARK_PYTHON': './venv1/bin/python',
+                    'spark.yarn.appMasterEnv.PYSPARK_DRIVER_PYTHON': './venv1/bin/python'}
+    )
+    # 4 этап: удаление Dataproc кластера
     delete_spark_cluster = DataprocDeleteClusterOperator(
         task_id="dp-cluster-delete-task",
         trigger_rule=TriggerRule.ALL_DONE,
@@ -151,4 +173,4 @@ with DAG(
     )
     # Формирование DAG из указанных выше этапов
     # pylint: disable=pointless-statement
-    create_spark_cluster >> poke_spark_processing >> delete_spark_cluster
+    create_spark_cluster >> poke_spark_processing >> poke_spark_processing2 >> delete_spark_cluster
